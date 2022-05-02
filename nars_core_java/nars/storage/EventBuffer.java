@@ -253,7 +253,7 @@ public abstract class EventBuffer extends Buffer<Task> {
     /**
      * find the insert position in the sequence list, the list sort by the occurrence time
      * @param task
-     * @return 
+     * @return `
      */
     protected int findIntertIndexInSequenceList(Task task){
         
@@ -329,7 +329,7 @@ public abstract class EventBuffer extends Buffer<Task> {
                     if(findIntertIndexInSequenceList(task) == -1)
                         sequenceList.add(0, task);
                     else
-                        sequenceList.add(findIntertIndexInSequenceList(task), task);            
+                        sequenceList.add(findIntertIndexInSequenceList(task), task);
                         insert = true;
                     }else{
                         // if the occurence time of the new task less than every task in the list
@@ -616,7 +616,10 @@ public abstract class EventBuffer extends Buffer<Task> {
      */
     @Override
     public boolean putIn(Task task, ArrayList<Task> list, int capacity) {
-        
+        if(getMemory().getReasoner().useGUI){
+            getMemory().getReasoner().GUI.AddTaskToBuffer(task, this);
+        }
+
         if(checkDuplicates(task,list))
             return false;
         
@@ -714,6 +717,11 @@ public abstract class EventBuffer extends Buffer<Task> {
         if(!this.getItemTable().isEmpty()){
             Task task = this.getItemTable().get(0);
             this.getItemTable().remove(0);
+
+            if(getMemory().getReasoner().useGUI){
+                getMemory().getReasoner().GUI.RemoveTaskFromBuffer(task, this);
+            }
+
             return task;
             // if the list is empty return null
         }else{

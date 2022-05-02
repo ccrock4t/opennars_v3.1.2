@@ -38,6 +38,7 @@ import nars.language.Equivalence;
 import nars.language.Implication;
 import nars.language.Negation;
 import nars.language.Term;
+import nars.main.NAR;
 import nars.main.NARSBatch;
 import nars.main.Parameters;
 import nars.storage.Memory;
@@ -90,6 +91,8 @@ public final class Concept extends Item {
     private ArrayList<Concept> executable_preconditions;
     
     private ArrayList<Task> general_executable_preconditions;
+
+    public boolean monitoredByGUI = false;
     
     public boolean observable = false;
 
@@ -819,7 +822,14 @@ public final class Concept extends Item {
      * @param termLink The termLink to be inserted
      */
     public void insertTermLink(TermLink termLink) {
+        if(getReasoner().useGUI){
+            getReasoner().GUI.AddTermLink(this,termLink);
+        }
         termLinks.putIn(termLink);
+    }
+
+    public NAR getReasoner(){
+        return this.getMemory().getReasoner();
     }
 
     /**

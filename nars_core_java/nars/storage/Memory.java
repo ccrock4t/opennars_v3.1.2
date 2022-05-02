@@ -25,6 +25,7 @@ package nars.storage;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import nars.mental_operator.Anticipate;
 import nars.mental_operator.Deactive;
 import nars.mental_operator.Escape;
@@ -212,6 +213,9 @@ public class Memory {
         if (concept == null) {
             concept = new Concept(term, this); // the only place to make a new Concept
             boolean created = concepts.putIn(concept);
+            if(getReasoner().useGUI){
+                getReasoner().GUI.AddNewConcept(concept); //GUI
+            }
             if (!created) {
                 return null;
             }

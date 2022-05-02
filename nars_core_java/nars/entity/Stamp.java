@@ -50,7 +50,7 @@ public class Stamp implements Cloneable {
      * or a Stamp be a field in {@link NAR} ? */
     private static long currentSerial = 0;
     /** serial numbers */
-    private long[] evidentialBase;
+    public long[] evidentialBase;
     /** evidentialBase baseLength */
     private int baseLength;
     /** creation time of the stamp */

@@ -18,8 +18,8 @@ import nars.io.OutputChannel;
 public class Shell {
     
     static String inputString = "";
-    
-    
+    static boolean paused = true;
+
     private static class InputThread extends Thread {
         private final BufferedReader bufIn;
         private final NAR reasoner;
@@ -67,9 +67,9 @@ public class Shell {
         @Override
         public void tickTimer() {}
     }
+
     
-    
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         NAR reasoner = new NAR();
         reasoner.addOutputChannel(new ShellOutput());
         InputThread t = new InputThread(System.in, reasoner);
@@ -79,18 +79,25 @@ public class Shell {
                          + "answers or increase volume with *volume=n with n=0..100");
         reasoner.run();
         reasoner.getSilenceValue().set(0);
-        int cnt = 0;
+
         while(true){
+            Thread.sleep(1);
+            if(reasoner.useGUI){
+                reasoner.GUI.ProcessSocket();
+            }
+
             synchronized(inputString) {
                 if(!"".equals(inputString)) {
                     try {
                         if(inputString.startsWith("*volume=")) { //volume to be consistent with OpenNARS
                             int val = Integer.parseInt(inputString.split("\\*volume=")[1]);
-                            if(val >= 0 && val <= 100) {
-                                reasoner.getSilenceValue().set(100-val);
-                            } else{
+                            if (val >= 0 && val <= 100) {
+                                reasoner.getSilenceValue().set(100 - val);
+                            } else {
                                 System.out.println("Volume ignored, not in range");
                             }
+                        }else if(inputString.startsWith("*cycle")){
+                            System.out.println("Cycle #" + reasoner.getTimer());
                         } else {
                             reasoner.textInputLine(inputString);
                         }
@@ -100,9 +107,8 @@ public class Shell {
                     }
                 }
             }
-            if(reasoner.getWalkingSteps() > 0)
+            if(reasoner.getWalkingSteps() > 0 || (!paused))
                 reasoner.cycle();
-            cnt++;
         }
     }
 }

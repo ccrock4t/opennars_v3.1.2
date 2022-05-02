@@ -4,20 +4,21 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import nars.entity.Stamp;
 import nars.entity.Task;
+import nars.gui.GUImain;
 import nars.io.InputChannel;
 import nars.io.OutputChannel;
 import nars.io.StringParser;
 import nars.io.Symbols;
-import nars.storage.InternalExperience;
+import nars.storage.InternalBuffer;
 import nars.storage.Memory;
-import nars.storage.OveralExperience;
+import nars.storage.GlobalBuffer;
 
 public class NAR {
 
     /** global DEBUG print switch */
     public static final boolean DEBUG = false;
     /** The name of the reasoner */
-    protected String name;
+    public String name;
     /** The memory of the reasoner */
     protected Memory memory;
     /** The input channels of the reasoner */
@@ -37,22 +38,31 @@ public class NAR {
     /** Budget Threshold - show output if its budget average above threshold */
     private final AtomicInteger silenceValue = new AtomicInteger(Parameters.SILENT_LEVEL);
     /** Internal Experience Buffer for derivations */
-    private final InternalExperience internalBuffer;
+    private final InternalBuffer internalBuffer;
     /** Overall Experience Buffer for input and tasks from internalBuffer */
-    private final OveralExperience globalBuffer;
+    private final GlobalBuffer globalBuffer;
     //private final Experience_From_Narsese narsese_Channel;
+    /** GUI */
+    public boolean useGUI = true;
+    public GUImain GUI;
     
     private final int internal_Duration = Parameters.MAX_BUFFER_DURATION_FACTOR * Parameters.DURATION_FOR_INTERNAL_BUFFER;
     private final int global_Duration = Parameters.MAX_BUFFER_DURATION_FACTOR * Parameters.DURATION_FOR_GLOBAL_BUFFER;
 
     public NAR() {
+        this.name = "OpenNARS v3.1.3";
         memory = new Memory(this);
         //System.out.println(memory.newStamp.getOccurrenceTime());
         inputChannels = new ArrayList();
         outputChannels = new ArrayList();
-        internalBuffer = new InternalExperience(memory, internal_Duration, "Internal");
-        globalBuffer = new OveralExperience(memory, global_Duration, "Global");
+        internalBuffer = new InternalBuffer(memory, internal_Duration, "Internal Buffer");
+        globalBuffer = new GlobalBuffer(memory, global_Duration, "Global Buffer");
        // narsese_Channel = new Experience_From_Narsese(memory, global_Duration);
+
+        if(this.useGUI){
+            // initialize GUI
+            this.GUI = new GUImain(this);
+        }
     }
     
     public void addInputChannel(InputChannel channel) {
@@ -203,11 +213,11 @@ public class NAR {
         return walkingSteps;
     }
     
-    public InternalExperience getInternalBuffer(){
+    public InternalBuffer getInternalBuffer(){
         return internalBuffer;        
     }
     
-    public OveralExperience getGlobalBuffer(){
+    public GlobalBuffer getGlobalBuffer(){
         return globalBuffer;
     }
     
