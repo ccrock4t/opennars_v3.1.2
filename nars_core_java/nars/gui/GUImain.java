@@ -25,6 +25,7 @@ package nars.gui;
 
 import com.google.gson.Gson;
 import nars.entity.Concept;
+import nars.entity.Sentence;
 import nars.entity.Task;
 import nars.language.Statement;
 import nars.language.Term;
@@ -111,13 +112,7 @@ public class GUImain {
             } else if (command.equals(APIKeys.COMMAND_GET_INITIALIZE)) {
                 Initialize();
             } else if (command.equals(APIKeys.COMMAND_GET_CONCEPT_INFO)) {
-                Concept concept = reasoner.getMemory().getConcept(new Term((String) data));
-                HashMap<String, Object> conceptInfo = new HashMap<>();
-                conceptInfo.put(APIKeys.KEY_CONCEPT_ID, concept.getTerm().toString());
-                if (concept.getTerm() instanceof Statement) {
-                    conceptInfo.put(APIKeys.KEY_BELIEFS, concept.getBeliefs());
-                }
-                POST(conceptInfo, APIKeys.PATH_SHOW_CONCEPT_INFO);
+                ShowConceptInfo((String)data);
             } else if (command.equals(APIKeys.COMMAND_UPDATE_BUFFER)) {
                 String buffer_name = (String) data;
                 if (buffer_name.equals(reasoner.getGlobalBuffer().getName())) {
@@ -138,21 +133,16 @@ public class GUImain {
      * * ===============================
      */
 
+
     public void AddNewConcepts(){
         if(pending_new_concepts_list.size() == 0) return;
         HashMap<String, Object> data = new HashMap<>();
         ArrayList<HashMap<String, Object>> concepts = new ArrayList<>();
 
         for(Concept concept : pending_new_concepts_list){
-            HashMap<String, Object> concept_data = new HashMap<>();
-            concept_data.put(APIKeys.KEY_CONCEPT_ID, concept.getTerm().toString());
-            String type = APIKeys.KEY_TERM_TYPE_ATOMIC;
-            if(concept.getTerm() instanceof Statement){
-                type = APIKeys.KEY_TERM_TYPE_STATEMENT;
-            }
-            concept_data.put(APIKeys.KEY_TERM_TYPE, type);
-            concepts.add(concept_data);
+            concepts.add(GetConceptMetadata(concept));
         }
+
         pending_new_concepts_list.clear();
 
         data.put(APIKeys.KEY_CONCEPTS, concepts);
@@ -187,7 +177,14 @@ public class GUImain {
         buffers.add(globalBufferMap);
         buffers.add(internalBufferMap);
 
+        //memory
+        ArrayList<HashMap<String, Object>> concepts = new ArrayList<>();
+        for(Concept concept : reasoner.getMemory().getConcepts()){
+            concepts.add(GetConceptMetadata(concept));
+        }
+
         initialize_jsonmap.put(APIKeys.KEY_BUFFERS, buffers);
+        initialize_jsonmap.put(APIKeys.KEY_CONCEPTS, concepts);
 
         POST(initialize_jsonmap, APIKeys.PATH_INITIALIZE);
     }
@@ -197,15 +194,27 @@ public class GUImain {
         ArrayList<HashMap<String, Object>> buffer_contents = new ArrayList<>();
 
         for(Object task : buffer){
-            HashMap<String, Object> task_data = new HashMap<>();
-            task_data.put(APIKeys.KEY_SENTENCE, ((Task)task).getSentence().toStringBrief());
-            task_data.put(APIKeys.KEY_SENTENCE, ((Task)task).getSentence().toStringBrief());
-            task_data.put(APIKeys.KEY_BUDGET, ((Task)task).getBudget().toStringBrief());
-            task_data.put(APIKeys.KEY_SENTENCE_ID, String.valueOf(((Task)task).getSentence().getStamp().evidentialBase[0]));
-            buffer_contents.add(task_data);
+            buffer_contents.add(GetTaskData((Task)task));
         }
+
         buffer_data.put(APIKeys.KEY_BUFFER_CONTENTS, buffer_contents);
         POST(buffer_data,APIKeys.PATH_UPDATE_BUFFER);
+    }
+
+    public void ShowConceptInfo(String termString){
+        Concept concept = reasoner.getMemory().getConcept(new Term(termString));
+        HashMap<String, Object> conceptInfo = new HashMap<>();
+        conceptInfo.put(APIKeys.KEY_CONCEPT_ID, concept.getTerm().toString());
+        if (concept.getTerm() instanceof Statement) {
+            ArrayList<HashMap<String, Object>> beliefs = new ArrayList<>();
+            for(Sentence belief: concept.getBeliefs()){
+                HashMap<String, Object> beliefInfo = new HashMap<>();
+                beliefInfo.put(APIKeys.KEY_SENTENCE, belief.toStringBrief());
+                beliefs.add(beliefInfo);
+            }
+            conceptInfo.put(APIKeys.KEY_BELIEFS, beliefs);
+        }
+        POST(conceptInfo, APIKeys.PATH_SHOW_CONCEPT_INFO);
     }
 
     public void POST(Object jsonMap, String path){
@@ -245,6 +254,29 @@ public class GUImain {
             e.printStackTrace();
         }
 
+    }
+
+    /***
+     * Helper functions
+     */
+
+    public HashMap<String, Object> GetConceptMetadata(Concept concept){
+        HashMap<String, Object> concept_data = new HashMap<>();
+        concept_data.put(APIKeys.KEY_CONCEPT_ID, concept.getTerm().toString());
+        String type = APIKeys.KEY_TERM_TYPE_ATOMIC;
+        if(concept.getTerm() instanceof Statement){
+            type = APIKeys.KEY_TERM_TYPE_STATEMENT;
+        }
+        concept_data.put(APIKeys.KEY_TERM_TYPE, type);
+        return concept_data;
+    }
+
+    public HashMap<String, Object> GetTaskData(Task task){
+        HashMap<String, Object> task_data = new HashMap<>();
+        task_data.put(APIKeys.KEY_SENTENCE, task.getSentence().toStringBrief());
+        task_data.put(APIKeys.KEY_BUDGET, task.getBudget().toStringBrief());
+        task_data.put(APIKeys.KEY_SENTENCE_ID, String.valueOf(task.getSentence().getStamp().evidentialBase[0]));
+        return task_data;
     }
 
 }
