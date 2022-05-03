@@ -616,10 +616,6 @@ public abstract class EventBuffer extends Buffer<Task> {
      */
     @Override
     public boolean putIn(Task task, ArrayList<Task> list, int capacity) {
-        if(getMemory().getReasoner().useGUI){
-            getMemory().getReasoner().GUI.AddTaskToBuffer(task, this);
-        }
-
         if(checkDuplicates(task,list))
             return false;
         
@@ -717,11 +713,6 @@ public abstract class EventBuffer extends Buffer<Task> {
         if(!this.getItemTable().isEmpty()){
             Task task = this.getItemTable().get(0);
             this.getItemTable().remove(0);
-
-            if(getMemory().getReasoner().useGUI){
-                getMemory().getReasoner().GUI.RemoveTaskFromBuffer(task, this);
-            }
-
             return task;
             // if the list is empty return null
         }else{

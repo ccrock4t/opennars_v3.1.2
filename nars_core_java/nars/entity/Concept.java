@@ -822,9 +822,6 @@ public final class Concept extends Item {
      * @param termLink The termLink to be inserted
      */
     public void insertTermLink(TermLink termLink) {
-        if(getReasoner().useGUI){
-            getReasoner().GUI.AddTermLink(this,termLink);
-        }
         termLinks.putIn(termLink);
     }
 

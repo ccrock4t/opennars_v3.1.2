@@ -26,7 +26,6 @@ package nars.gui;
 import com.google.gson.Gson;
 import nars.entity.Concept;
 import nars.entity.Task;
-import nars.entity.TermLink;
 import nars.language.Statement;
 import nars.language.Term;
 import nars.main.NAR;
@@ -53,9 +52,12 @@ public class GUImain {
     /** queue shared between threads */
     List<String> pending_commands_list;
 
+    public List<Concept> pending_new_concepts_list;
+
     public GUImain(NAR nar) {
         reasoner = nar;
         pending_commands_list = Collections.synchronizedList(new LinkedList<>());
+        pending_new_concepts_list = new ArrayList<>();
         try {
             serverSocket = new ServerSocket(Config.NARS_listen_port);
 
@@ -75,6 +77,7 @@ public class GUImain {
                                 System.out.println("Got input from GUI " + data);
                                 pending_commands_list.add(data.toString());
                             }
+
                         }
                     } catch (IOException e) {
                         System.err.println("Accept failed. " + e.toString());
@@ -86,33 +89,13 @@ public class GUImain {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        HashMap<String, Object> initialize_jsonmap = new HashMap<>();
-        initialize_jsonmap.put(APIKeys.KEY_NARS_NAME, reasoner.name);
-
-        //channels and buffers
-        ArrayList<HashMap<String, Object>> buffers = new ArrayList<>();
-
-        HashMap<String, Object> globalBufferMap = new HashMap<>();
-        globalBufferMap.put(APIKeys.KEY_BUFFER_NAME, nar.getGlobalBuffer().getName());
-        globalBufferMap.put(APIKeys.KEY_BUFFER_CAPACITY, reasoner.getGlobalBuffer().capacity());
-
-        HashMap<String, Object> internalBufferMap = new HashMap<>();
-        internalBufferMap.put(APIKeys.KEY_BUFFER_NAME, nar.getInternalBuffer().getName());
-        internalBufferMap.put(APIKeys.KEY_BUFFER_CAPACITY, reasoner.getInternalBuffer().capacity());
-
-        buffers.add(globalBufferMap);
-        buffers.add(internalBufferMap);
-
-        initialize_jsonmap.put(APIKeys.KEY_BUFFERS, buffers);
-
-        POST(initialize_jsonmap, APIKeys.PATH_INITIALIZE);
     }
 
     /**
      *  Handle requests from the GUI
      */
     public void ProcessSocket(){
-        while(pending_commands_list.size() > 0){
+        if(pending_commands_list.size() > 0) {
             System.out.println("Taking input from shared list");
             String jsonString = pending_commands_list.remove(0);
             Gson gson = new Gson();
@@ -120,19 +103,31 @@ public class GUImain {
 
             String command = (String) jsonMap.get(APIKeys.COMMAND);
             Object data = jsonMap.get(APIKeys.KEY_DATA);
-            System.out.println("jsonmap " + (String)data);
-            if(command.equals(APIKeys.COMMAND_INPUT)){
+
+            if (command.equals(APIKeys.COMMAND_INPUT)) {
                 String[] lines = ((String) data).split("\n");
-                for(String line : lines)
+                for (String line : lines)
                     reasoner.textInputLine(line);
-            }else if(command.equals(APIKeys.COMMAND_GET_CONCEPT_INFO)){
+            } else if (command.equals(APIKeys.COMMAND_GET_INITIALIZE)) {
+                Initialize();
+            } else if (command.equals(APIKeys.COMMAND_GET_CONCEPT_INFO)) {
                 Concept concept = reasoner.getMemory().getConcept(new Term((String) data));
                 HashMap<String, Object> conceptInfo = new HashMap<>();
                 conceptInfo.put(APIKeys.KEY_CONCEPT_ID, concept.getTerm().toString());
-                if(concept.getTerm() instanceof Statement){
-                    conceptInfo.put(APIKeys.KEY_BELIEFS,concept.getBeliefs());
+                if (concept.getTerm() instanceof Statement) {
+                    conceptInfo.put(APIKeys.KEY_BELIEFS, concept.getBeliefs());
                 }
-                POST(conceptInfo,APIKeys.PATH_SHOW_CONCEPT_INFO);
+                POST(conceptInfo, APIKeys.PATH_SHOW_CONCEPT_INFO);
+            } else if (command.equals(APIKeys.COMMAND_UPDATE_BUFFER)) {
+                String buffer_name = (String) data;
+                if (buffer_name.equals(reasoner.getGlobalBuffer().getName())) {
+                    UpdateBuffer(reasoner.getGlobalBuffer());
+                } else if (buffer_name.equals(reasoner.getInternalBuffer().getName())) {
+                    UpdateBuffer(reasoner.getInternalBuffer());
+                }
+
+            }else if(command.equals(APIKeys.COMMAND_GET_NEW_CONCEPTS)){
+                AddNewConcepts();
             }
         }
     }
@@ -143,44 +138,77 @@ public class GUImain {
      * * ===============================
      */
 
-    public void AddNewConcept(Concept concept){
+    public void AddNewConcepts(){
+        if(pending_new_concepts_list.size() == 0) return;
         HashMap<String, Object> data = new HashMap<>();
-        data.put(APIKeys.KEY_CONCEPT_ID, concept.getTerm().toString());
-        String type = APIKeys.KEY_TERM_TYPE_ATOMIC;
-        if(concept.getTerm() instanceof Statement){
-            type = APIKeys.KEY_TERM_TYPE_STATEMENT;
+        ArrayList<HashMap<String, Object>> concepts = new ArrayList<>();
+
+        for(Concept concept : pending_new_concepts_list){
+            HashMap<String, Object> concept_data = new HashMap<>();
+            concept_data.put(APIKeys.KEY_CONCEPT_ID, concept.getTerm().toString());
+            String type = APIKeys.KEY_TERM_TYPE_ATOMIC;
+            if(concept.getTerm() instanceof Statement){
+                type = APIKeys.KEY_TERM_TYPE_STATEMENT;
+            }
+            concept_data.put(APIKeys.KEY_TERM_TYPE, type);
+            concepts.add(concept_data);
         }
-        data.put(APIKeys.KEY_TERM_TYPE, type);
-        POST(data,APIKeys.PATH_ADD_CONCEPT);
+        pending_new_concepts_list.clear();
+
+        data.put(APIKeys.KEY_CONCEPTS, concepts);
+
+        POST(data,APIKeys.PATH_ADD_NEW_CONCEPTS);
+    }
+//
+//    public void AddTermLink(Concept source, TermLink termLink){
+//        HashMap<String, Object> data = new HashMap<>();
+//        data.put(APIKeys.KEY_LINK_SOURCE, source.getTerm().toString());
+//        data.put(APIKeys.KEY_LINK_TARGET, termLink.getTarget().toString());
+//        data.put(APIKeys.KEY_LINK_TYPE, APIKeys.KEY_LINK_TYPE_TERMLINK);
+//        POST(data,APIKeys.PATH_ADD_LINK);
+//    }
+
+
+    public void Initialize(){
+        HashMap<String, Object> initialize_jsonmap = new HashMap<>();
+        initialize_jsonmap.put(APIKeys.KEY_NARS_NAME, reasoner.name);
+
+        //channels and buffers
+        ArrayList<HashMap<String, Object>> buffers = new ArrayList<>();
+
+        HashMap<String, Object> globalBufferMap = new HashMap<>();
+        globalBufferMap.put(APIKeys.KEY_BUFFER_NAME, reasoner.getGlobalBuffer().getName());
+        globalBufferMap.put(APIKeys.KEY_BUFFER_CAPACITY, reasoner.getGlobalBuffer().capacity());
+
+        HashMap<String, Object> internalBufferMap = new HashMap<>();
+        internalBufferMap.put(APIKeys.KEY_BUFFER_NAME, reasoner.getInternalBuffer().getName());
+        internalBufferMap.put(APIKeys.KEY_BUFFER_CAPACITY, reasoner.getInternalBuffer().capacity());
+
+        buffers.add(globalBufferMap);
+        buffers.add(internalBufferMap);
+
+        initialize_jsonmap.put(APIKeys.KEY_BUFFERS, buffers);
+
+        POST(initialize_jsonmap, APIKeys.PATH_INITIALIZE);
+    }
+    public void UpdateBuffer(Buffer buffer){
+        HashMap<String, Object> buffer_data = new HashMap<>();
+        buffer_data.put(APIKeys.KEY_BUFFER_NAME, buffer.getName());
+        ArrayList<HashMap<String, Object>> buffer_contents = new ArrayList<>();
+
+        for(Object task : buffer){
+            HashMap<String, Object> task_data = new HashMap<>();
+            task_data.put(APIKeys.KEY_SENTENCE, ((Task)task).getSentence().toStringBrief());
+            task_data.put(APIKeys.KEY_SENTENCE, ((Task)task).getSentence().toStringBrief());
+            task_data.put(APIKeys.KEY_BUDGET, ((Task)task).getBudget().toStringBrief());
+            task_data.put(APIKeys.KEY_SENTENCE_ID, String.valueOf(((Task)task).getSentence().getStamp().evidentialBase[0]));
+            buffer_contents.add(task_data);
+        }
+        buffer_data.put(APIKeys.KEY_BUFFER_CONTENTS, buffer_contents);
+        POST(buffer_data,APIKeys.PATH_UPDATE_BUFFER);
     }
 
-    public void AddTermLink(Concept source, TermLink termLink){
-        HashMap<String, Object> data = new HashMap<>();
-        data.put(APIKeys.KEY_LINK_SOURCE, source.getTerm().toString());
-        data.put(APIKeys.KEY_LINK_TARGET, termLink.getTarget().toString());
-        data.put(APIKeys.KEY_LINK_TYPE, APIKeys.KEY_LINK_TYPE_TERMLINK);
-        POST(data,APIKeys.PATH_ADD_LINK);
-    }
-
-    public void AddTaskToBuffer(Task task, Buffer buffer){
-        HashMap<String, Object> data = new HashMap<>();
-        data.put(APIKeys.KEY_BUFFER_NAME, buffer.getName());
-        data.put(APIKeys.KEY_SENTENCE, task.getSentence().toStringBrief());
-        data.put(APIKeys.KEY_BUDGET, task.getBudget().toStringBrief());
-        data.put(APIKeys.KEY_SENTENCE_ID, String.valueOf(task.getSentence().getStamp().evidentialBase[0]));
-        POST(data,APIKeys.PATH_ADD_TASK_TO_BUFFER);
-    }
-
-    public void RemoveTaskFromBuffer(Task task, Buffer buffer){
-        HashMap<String, Object> data = new HashMap<>();
-        data.put(APIKeys.KEY_BUFFER_NAME, buffer.getName());
-        data.put(APIKeys.KEY_SENTENCE, task.getSentence().toStringBrief());
-        data.put(APIKeys.KEY_BUDGET, task.getBudget().toStringBrief());
-        data.put(APIKeys.KEY_SENTENCE_ID, String.valueOf(task.getSentence().getStamp().evidentialBase[0]));
-        POST(data,APIKeys.PATH_REMOVE_TASK_FROM_BUFFER);
-    }
-
-    public void POST(HashMap<String, Object> jsonMap, String path){
+    public void POST(Object jsonMap, String path){
         //post
         URL url = null;
         try {
@@ -194,7 +222,7 @@ public class GUImain {
             String jsonString = gson.toJson(jsonMap);
 
             byte[] out = jsonString.getBytes(StandardCharsets.UTF_8);
-            System.out.println(jsonString);
+            System.out.println("Sending to GUI: " + jsonString);
             int length = out.length;
 
             con.setFixedLengthStreamingMode(length);

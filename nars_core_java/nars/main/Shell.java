@@ -85,7 +85,6 @@ public class Shell {
             if(reasoner.useGUI){
                 reasoner.GUI.ProcessSocket();
             }
-
             synchronized(inputString) {
                 if(!"".equals(inputString)) {
                     try {
@@ -98,6 +97,9 @@ public class Shell {
                             }
                         }else if(inputString.startsWith("*cycle")){
                             System.out.println("Cycle #" + reasoner.getTimer());
+                        }else if(inputString.startsWith("*paused")){
+                            paused = !paused;
+                            System.out.println("Setting paused to: " + paused);
                         } else {
                             reasoner.textInputLine(inputString);
                         }

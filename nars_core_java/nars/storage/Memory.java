@@ -213,11 +213,11 @@ public class Memory {
         if (concept == null) {
             concept = new Concept(term, this); // the only place to make a new Concept
             boolean created = concepts.putIn(concept);
-            if(getReasoner().useGUI){
-                getReasoner().GUI.AddNewConcept(concept); //GUI
-            }
             if (!created) {
                 return null;
+            }
+            if(getReasoner().useGUI){
+                getReasoner().GUI.pending_new_concepts_list.add(concept); //GUI
             }
         }
         return concept;
